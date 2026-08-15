@@ -30,7 +30,13 @@ sArenaMixin.defaultSettings = {
         drText = false,
         arenaNames = true,
         drEnabled = true,
-        specDetection = true,
+        -- Class-only out of the box. The class icon resolves from the enemy's buffs as
+        -- the gates open, so it is up front the whole match; the spec icon can only be
+        -- narrowed down once the enemy uses a signature ability, which means enabling
+        -- spec detection trades a stable icon for one that changes partway in. That is
+        -- a worthwhile trade for some people, so it stays one toggle away -- but it is
+        -- opt-in rather than the default.
+        specDetection = false,
         classSpecEnabled = true,
         castBarEnabled = true,
     },
@@ -741,6 +747,14 @@ function sArenaFrameMixin:OnEvent(event, eventUnit, ...)
 
         elseif (event == "UNIT_AURA") then
             self:FindAura()
+            -- The enemy's buffs are not necessarily readable on the very first frame
+            -- the unit exists -- they arrive over the following moments as UNIT_AURA
+            -- fires. Re-running detection here is what makes the class icon land as
+            -- the gates open instead of at the enemy's first cast. It stops once a
+            -- spec is known, since nothing an aura can tell us would improve on that.
+            if not self.specTexture then
+                self:DetectSpec(unit, nil)
+            end
         elseif (event == "UNIT_HEALTH") then
             self:SetLifeState()
             self:SetStatusText()
@@ -782,6 +796,7 @@ function sArenaFrameMixin:OnEvent(event, eventUnit, ...)
         self.CastBar:Hide()
         self.specTexture = nil
         self.class = nil
+        self.coaClass = nil
         self.currentClassIconTexture = nil
         self.currentClassIconStartTime = 0
         self:UpdatePlayer()
@@ -975,6 +990,7 @@ function sArenaFrameMixin:GetClassAndSpec()
     if (instanceType ~= "arena") then
         self.specTexture = nil
         self.class = nil
+        self.coaClass = nil
         self.SpecBorderOverlay:Hide()
         self.ClassIcon:SetTexture("Interface\\Icons\\Inv_misc_questionmark")
     elseif (not self.specTexture or not self.class) then
@@ -1013,7 +1029,10 @@ function sArenaFrameMixin:UpdateClassIcon()
     end
 
     local unknown = "Interface\\Icons\\Inv_misc_questionmark"
-    local texture = self.class and "class" or unknown
+    -- coaClass counts here as well as class: a CoA class detected from the enemy's
+    -- buffs is drawable on its own, and waiting on UnitClass() would throw that away
+    -- on any unit the client reports no usable class for.
+    local texture = (self.class or self.coaClass) and "class" or unknown
 
    
     if self.currentAuraSpellName then

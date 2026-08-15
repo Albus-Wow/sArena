@@ -892,6 +892,298 @@ local coaClassIconDB = {
 
 sArenaCoAClassIcons = coaClassIconDB  -- exposed globally so sArena.lua's UpdateClassIcon can use it
 
+-- Gates-open class detection.
+--
+-- Every CoA class has a set of long-duration (30 minute, in a few cases shorter)
+-- buffs that players put up during the arena preparation phase, so they are already
+-- active on the enemy the instant the gates open and the frames become readable.
+-- Unlike the spec abilities in coaSpellDB, these can be seen without waiting for the
+-- enemy to do anything, which is what lets the class icon appear at the gates.
+--
+-- Two properties of this table matter and are enforced by how it was generated from
+-- the extracted CoA ability data:
+--   * every name maps to exactly one class, with no collisions anywhere in the data,
+--     so a match here is never ambiguous;
+--   * a name is only ever evidence of the CLASS, never of the spec. These are
+--     class-tree buffs that any spec of the class can have, so the spec recorded
+--     against them upstream is meaningless. Detection from this table therefore
+--     leaves the spec unset and lets a later signature cast fill it in.
+--
+-- These buffs have a 30-40 yd range and are handed to the whole enemy team, so a
+-- match only counts when the unit is its own aura source (see DetectSpec) -- an
+-- unfiltered scan would report one player's class on every enemy frame.
+local coaClassAuraDB = {
+    -- Barbarian
+    ["Brutal Shout"] = "Barbarian",
+    ["Cheers!"] = "Barbarian",
+    ["Enduring Shout"] = "Barbarian",
+    -- Bloodmage
+    ["Blood Bond"] = "Bloodmage",
+    ["Blood Covenant"] = "Bloodmage",
+    ["Blood Shield"] = "Bloodmage",
+    ["Bloodsoaked Offering"] = "Bloodmage",
+    ["Bloodthorns"] = "Bloodmage",
+    ["Coagulated Shield"] = "Bloodmage",
+    ["Greater Bloodsoaked Offering"] = "Bloodmage",
+    ["Greater Bloodthorns"] = "Bloodmage",
+    ["Greater Sanguinary Offering"] = "Bloodmage",
+    ["Moon Gaze"] = "Bloodmage",
+    ["Sanguinary Offering"] = "Bloodmage",
+    ["Shadowfang Shield"] = "Bloodmage",
+    ["Slaughterhouse Offering"] = "Bloodmage",
+    ["Vital Shield"] = "Bloodmage",
+    -- Chronomancer
+    ["Accelerate"] = "Chronomancer",
+    ["Accelerated Learning"] = "Chronomancer",
+    ["Chromie's Wisdom"] = "Chronomancer",
+    ["Decelerate"] = "Chronomancer",
+    ["Greater Chromie's Wisdom"] = "Chronomancer",
+    ["Greater Nozdormu's Wisdom"] = "Chronomancer",
+    ["Hourglass of Time"] = "Chronomancer",
+    ["Moment's Reprieve"] = "Chronomancer",
+    ["Nozdormu's Wisdom"] = "Chronomancer",
+    ["Temporal Resilience"] = "Chronomancer",
+    ["Temporal Restoration"] = "Chronomancer",
+    ["Temporal Swiftness"] = "Chronomancer",
+    ["Timeguard"] = "Chronomancer",
+    -- Cultist
+    ["Abyssal Covenant"] = "Cultist",
+    ["Eldritch Ritual"] = "Cultist",
+    ["Entropic Fog"] = "Cultist",
+    ["Greater Void Blessing"] = "Cultist",
+    ["Greater Whispers of C'thun"] = "Cultist",
+    ["Greater Whispers of N'zoth"] = "Cultist",
+    ["Greater Whispers of Y'shaarj"] = "Cultist",
+    ["Saronite Prayer"] = "Cultist",
+    ["Sow Fear"] = "Cultist",
+    ["Summon: Faceless Destroyer"] = "Cultist",
+    ["Summoning Obelisk"] = "Cultist",
+    ["Void Blessing"] = "Cultist",
+    ["Wave of Doubt"] = "Cultist",
+    ["Whispers of C'thun"] = "Cultist",
+    ["Whispers of N'Zoth"] = "Cultist",
+    ["Whispers of Y'shaarj"] = "Cultist",
+    ["Whispers of Yogg-Saron"] = "Cultist",
+    -- Felsworn
+    ["Bane of Frailty"] = "Felsworn",
+    ["Greater Illidari Intuition"] = "Felsworn",
+    ["Greater Man'ari Intuition"] = "Felsworn",
+    ["Illidari Blessing"] = "Felsworn",
+    ["Illidari Intuition"] = "Felsworn",
+    ["Immolation Aura"] = "Felsworn",
+    ["Man'ari Intuition"] = "Felsworn",
+    -- Guardian
+    ["Banner of Rallying"] = "Guardian",
+    ["Banner of Recovery"] = "Guardian",
+    ["Battle Drums"] = "Guardian",
+    ["Feats of Glory"] = "Guardian",
+    ["Feats of Honor"] = "Guardian",
+    ["Fire Protection"] = "Guardian",
+    ["Greater Fire Protection"] = "Guardian",
+    ["Greater Honor"] = "Guardian",
+    ["Honor"] = "Guardian",
+    ["Standard of Might"] = "Guardian",
+    ["Standard of Spellwarding"] = "Guardian",
+    ["Standard of Supremacy"] = "Guardian",
+    -- KnightOfXoroth
+    ["Chains of Binding"] = "KnightOfXoroth",
+    ["Dreadsteed Portal"] = "KnightOfXoroth",
+    ["Greater Mark of Blaumeux"] = "KnightOfXoroth",
+    ["Greater Mark of Korth'azz"] = "KnightOfXoroth",
+    ["Greater Mark of Korth’azz"] = "KnightOfXoroth",
+    ["Greater Mark of Rivendare"] = "KnightOfXoroth",
+    ["Greater Mark of Zeliek"] = "KnightOfXoroth",
+    ["Hell's Forge"] = "KnightOfXoroth",
+    ["Mark of Blaumeux"] = "KnightOfXoroth",
+    ["Mark of Korth'azz"] = "KnightOfXoroth",
+    ["Mark of Rivendare"] = "KnightOfXoroth",
+    ["Mark of Zeliek"] = "KnightOfXoroth",
+    -- Necromancer
+    ["Awaken The Dead"] = "Necromancer",
+    ["Bone Ward"] = "Necromancer",
+    ["Chill of the Tomb"] = "Necromancer",
+    ["Fetid Ward"] = "Necromancer",
+    ["Foul Mandate"] = "Necromancer",
+    ["Greater Chill of the Tomb"] = "Necromancer",
+    ["Greater Foul Mandate"] = "Necromancer",
+    ["Greater Grim Mandate"] = "Necromancer",
+    ["Greater Razorice"] = "Necromancer",
+    ["Grim Mandate"] = "Necromancer",
+    ["Lich Armor"] = "Necromancer",
+    ["Mortuary Bond"] = "Necromancer",
+    ["Phylactery"] = "Necromancer",
+    ["Raise: Skeletal Smith"] = "Necromancer",
+    ["Razorice"] = "Necromancer",
+    ["Scourge Summoning Ritual"] = "Necromancer",
+    -- Primalist
+    ["Bash"] = "Primalist",
+    ["Earthen Endurance"] = "Primalist",
+    ["Essence of Convergence"] = "Primalist",
+    ["Essence of Dispersion"] = "Primalist",
+    ["Essence of Nature"] = "Primalist",
+    ["Fae Dust"] = "Primalist",
+    ["Greater Earthen Endurance"] = "Primalist",
+    ["Greater Essence of Convergence"] = "Primalist",
+    ["Greater Essence of Nature"] = "Primalist",
+    ["Greater Grove Instinct"] = "Primalist",
+    ["Greater Primal Instinct"] = "Primalist",
+    ["Grove Instinct"] = "Primalist",
+    ["Primal Instinct"] = "Primalist",
+    ["Primal Senses"] = "Primalist",
+    -- Pyromancer
+    ["Ashen Skin"] = "Pyromancer",
+    ["Dragon Skin"] = "Pyromancer",
+    ["Ember Skin"] = "Pyromancer",
+    ["Greater Seal of Al'ar"] = "Pyromancer",
+    ["Greater Seal of Alysrazor"] = "Pyromancer",
+    ["Make Campfire"] = "Pyromancer",
+    ["Neltharion's Resolve"] = "Pyromancer",
+    ["Phoenix Blessing"] = "Pyromancer",
+    ["Seal of Al'ar"] = "Pyromancer",
+    ["Seal of Alysrazor"] = "Pyromancer",
+    ["Summon Flame Orb"] = "Pyromancer",
+    -- Ranger
+    ["Broken Ranks"] = "Ranger",
+    ["Craft: Leather Map"] = "Ranger",
+    ["Craft: Makeshift Leather Boots"] = "Ranger",
+    ["Falcon Scout"] = "Ranger",
+    ["Falcon's Focus"] = "Ranger",
+    ["Footpad's Adaptation"] = "Ranger",
+    ["Greater Footpad's Adaptation"] = "Ranger",
+    ["Greater Woodsman's Adaptation"] = "Ranger",
+    ["Wild Blessing"] = "Ranger",
+    ["Woodsman's Adaptation"] = "Ranger",
+    -- Reaper
+    ["Crimson Pact"] = "Reaper",
+    ["Greater Rite of Perseverance"] = "Reaper",
+    ["Greater Rite of Power"] = "Reaper",
+    ["Greater Rite of Resolve"] = "Reaper",
+    ["Possess"] = "Reaper",
+    ["Reaper's Pact"] = "Reaper",
+    ["Rite of Perseverance"] = "Reaper",
+    ["Rite of Power"] = "Reaper",
+    ["Rite of Resolve"] = "Reaper",
+    ["Spectral Eye"] = "Reaper",
+    -- Runemaster
+    ["Conjure: Traprune"] = "Runemaster",
+    ["Etching of the Dextrous"] = "Runemaster",
+    ["Etching of the Leylines"] = "Runemaster",
+    ["Etching of the Magi"] = "Runemaster",
+    ["Ethereal Oil"] = "Runemaster",
+    ["Greater Etching of the Dextrous"] = "Runemaster",
+    ["Greater Etching of the Leylines"] = "Runemaster",
+    ["Greater Etching of the Magi"] = "Runemaster",
+    ["Greater Inscription: Arcane"] = "Runemaster",
+    ["Greater Inscription: Fire"] = "Runemaster",
+    ["Greater Inscription: Frost"] = "Runemaster",
+    ["Greater Inscription: Leyline"] = "Runemaster",
+    ["Greater Inscription: Nature"] = "Runemaster",
+    ["Homebound Runestone"] = "Runemaster",
+    ["Incanter's Tome"] = "Runemaster",
+    ["Inscription: Arcane"] = "Runemaster",
+    ["Inscription: Fire"] = "Runemaster",
+    ["Inscription: Frost"] = "Runemaster",
+    ["Inscription: Leyline"] = "Runemaster",
+    ["Inscription: Nature"] = "Runemaster",
+    ["Open Riftgate"] = "Runemaster",
+    -- Starcaller
+    ["Arcane Protection"] = "Starcaller",
+    ["Celestial Mind"] = "Starcaller",
+    ["Galactic Vigor"] = "Starcaller",
+    ["Grace of the Moon"] = "Starcaller",
+    ["Greater Arcane Protection"] = "Starcaller",
+    ["Greater Celestial Mind"] = "Starcaller",
+    -- Stormbringer
+    ["Aether Current"] = "Stormbringer",
+    ["Call of the Lightning"] = "Stormbringer",
+    ["Call of the Storm"] = "Stormbringer",
+    ["Call of the Wind"] = "Stormbringer",
+    ["Conjure Thunderkeg"] = "Stormbringer",
+    ["Greater Call of the Lightning"] = "Stormbringer",
+    ["Greater Call of the Storm"] = "Stormbringer",
+    ["Greater Call of the Wind"] = "Stormbringer",
+    ["Shocking Aegis"] = "Stormbringer",
+    ["Tempest Aegis"] = "Stormbringer",
+    ["Wall of Lightning"] = "Stormbringer",
+    ["Whirlwind Aegis"] = "Stormbringer",
+    ["Wind Gate"] = "Stormbringer",
+    -- SunCleric
+    ["Bless"] = "SunCleric",
+    ["Devotion of Dawn"] = "SunCleric",
+    ["Devotion of Emperors"] = "SunCleric",
+    ["Devotion of Grace"] = "SunCleric",
+    ["Devotion of Radiance"] = "SunCleric",
+    ["Greater Devotion of Dawn"] = "SunCleric",
+    ["Greater Devotion of Emperors"] = "SunCleric",
+    ["Greater Devotion of Grace"] = "SunCleric",
+    ["Greater Devotion of Radiance"] = "SunCleric",
+    ["Rejuvenating Rays"] = "SunCleric",
+    ["Solar Guidance"] = "SunCleric",
+    -- Templar
+    ["Cauterizing Cut"] = "Templar",
+    ["Gift of Fervor"] = "Templar",
+    ["Gift of Zeal"] = "Templar",
+    ["Greater Crusader's Oath"] = "Templar",
+    ["Greater Gift of Zeal"] = "Templar",
+    ["Righteous Custodian"] = "Templar",
+    -- Tinker
+    ["Arcane Bionics"] = "Tinker",
+    ["Build: Sentry Turret"] = "Tinker",
+    ["Deploy Bomb"] = "Tinker",
+    ["Deploy Turret Wall"] = "Tinker",
+    ["Greater Mana Module"] = "Tinker",
+    ["Greater Power Module"] = "Tinker",
+    ["Mana Module"] = "Tinker",
+    ["Nanobot Recharger"] = "Tinker",
+    ["Nanobot Reconstruction"] = "Tinker",
+    ["Nanobot Swarm"] = "Tinker",
+    ["Power Module"] = "Tinker",
+    ["Shrapnel Mine"] = "Tinker",
+    ["Strength Bionics"] = "Tinker",
+    ["Tinkering Tools"] = "Tinker",
+    -- Venomancer
+    ["Beetle Pheromones"] = "Venomancer",
+    ["Champion of the Spider"] = "Venomancer",
+    ["Envenom Weapons"] = "Venomancer",
+    ["Envenomed Weapons"] = "Venomancer",
+    ["Greater Beetle Pheromones"] = "Venomancer",
+    ["Greater Spider Pheromones"] = "Venomancer",
+    ["Greater Toxic Pheromones"] = "Venomancer",
+    ["Parasite"] = "Venomancer",
+    ["Spider Pheromones"] = "Venomancer",
+    ["Toxic Pheromones"] = "Venomancer",
+    ["Venom Resistance"] = "Venomancer",
+    -- WitchDoctor
+    ["Cleansing Idol"] = "WitchDoctor",
+    ["Dark Idol"] = "WitchDoctor",
+    ["Death Draught"] = "WitchDoctor",
+    ["Graven Effigy"] = "WitchDoctor",
+    ["Greater Spirit Wuju"] = "WitchDoctor",
+    ["Healing Ward"] = "WitchDoctor",
+    ["Hexing Effigy"] = "WitchDoctor",
+    ["Jungle Idol"] = "WitchDoctor",
+    ["Mojo Cauldron"] = "WitchDoctor",
+    ["Power Wuju"] = "WitchDoctor",
+    ["Sentry Ward"] = "WitchDoctor",
+    ["Serene Idol"] = "WitchDoctor",
+    ["Serpent Ward"] = "WitchDoctor",
+    ["Shadow Effigy"] = "WitchDoctor",
+    ["Spirit Wuju"] = "WitchDoctor",
+    ["Vitality Ward"] = "WitchDoctor",
+    ["Voodoo Alchemy"] = "WitchDoctor",
+    -- WitchHunter
+    ["Brand of the Profane"] = "WitchHunter",
+    ["Death Trap"] = "WitchHunter",
+    ["Greater Inquisitor's Edict"] = "WitchHunter",
+    ["Greater Knight's Edict"] = "WitchHunter",
+    ["Greater Witching Edict"] = "WitchHunter",
+    ["Inquisitor's Edict"] = "WitchHunter",
+    ["Inquisitor's Trap"] = "WitchHunter",
+    ["Knight's Edict"] = "WitchHunter",
+    ["Scourge Trap"] = "WitchHunter",
+    ["Witching Edict"] = "WitchHunter",
+}
+
 local coaIconCache = {}  -- spellId -> bare icon filename, used only when the extracted
                           -- data didn't already give us one (see ResolveCoAIcon)
 local function ResolveCoAIcon(spellId, knownIcon)
@@ -1294,11 +1586,33 @@ local function ApplyCoAIcon(self, entry)
     return true
 end
 
+-- Records the CoA class detected from a class buff (see coaClassAuraDB) and repaints
+-- the class-icon slot. This deliberately leaves self.specTexture alone: the buff proves
+-- the class but not the spec, so a signature cast can still upgrade the frame to a spec
+-- icon later in the match.
+--
+-- The cache clear is required, not defensive. UpdateClassIcon skips the repaint when the
+-- texture it is about to draw matches the last one it drew, and both the "we don't know
+-- this unit" question mark and a resolved CoA class icon are drawn under the same "class"
+-- cache key -- so without invalidating it here the icon would stay a question mark for
+-- the whole match.
+local function ApplyCoAClass(self, coaClass)
+    if self.coaClass == coaClass then return end
+    self.coaClass = coaClass
+    self.currentClassIconTexture = nil
+    self:UpdateClassIcon()
+end
+
 function sArenaFrameMixin:DetectSpec(unit, spellParam)
-    -- Master switches: lets specDetection be turned off entirely, or the whole
-    -- class/spec icon module including class icons (see Config.lua)
-    if self.parent.db.profile.specDetection == false then return end
+    -- Master switch for the whole class/spec icon module, class icons included.
     if self.parent.db.profile.classSpecEnabled == false then return end
+
+    -- "Enable Spec Detection" off means class-only: the class-buff lookups below still
+    -- run and the frame still gets a class icon, only the spec lookups are skipped.
+    -- This used to return outright, which on CoA suppressed the class icon too and
+    -- left the frame on a question mark for the whole match -- there was no class
+    -- detection separate from spec detection for it to fall back to.
+    local specAllowed = self.parent.db.profile.specDetection ~= false
 
     local unit = unit or self.unit
     local _, class = UnitClass(unit)
@@ -1313,14 +1627,23 @@ function sArenaFrameMixin:DetectSpec(unit, spellParam)
             spellName = GetSpellInfo(spellParam)
         end
         
-        -- Conquest of Azeroth: class-agnostic direct lookup, checked first
-        if spellName and coaSpellDB[spellName] then
+        -- Conquest of Azeroth: class-agnostic direct lookup, checked first.
+        -- Class buffs are handled ahead of the spec table for the same reason as in
+        -- the aura sweep below: 48 of them also appear in coaSpellDB against one
+        -- arbitrary spec of the class, and any spec of that class can cast them, so
+        -- reading a spec out of one would pin the wrong icon to the frame.
+        if spellName and coaClassAuraDB[spellName] then
+            ApplyCoAClass(self, coaClassAuraDB[spellName])
+            return
+        end
+
+        if specAllowed and spellName and coaSpellDB[spellName] then
             if ApplyCoAIcon(self, coaSpellDB[spellName]) then
                 return
             end
         end
-        
-        if spellName and spellDB[spellName] and specClass then
+
+        if specAllowed and spellName and spellDB[spellName] and specClass then
             local specTex = specClass[spellDB[spellName]]
             if specTex then
                 self.specTexture = specTex
@@ -1337,26 +1660,52 @@ function sArenaFrameMixin:DetectSpec(unit, spellParam)
     end
 
 
+    -- Aura sweep. This is the branch that runs when the gates open: the enemy is
+    -- already carrying the buffs they put up during the preparation phase, so the
+    -- class can be read off them straight away instead of waiting for a cast.
+    --
+    -- Only auras the unit is its own source for are considered. CoA class buffs are
+    -- 30-40 yd team buffs, so every member of the enemy team carries the buffs of
+    -- every other member -- without this filter one player's class would be reported
+    -- on all of their frames.
+    local foundClass
+
     for i = 1, 40 do
         local name, _, icon, _, _, _, _, source = UnitAura(unit, i, "HELPFUL")
         if name then
-            if coaSpellDB[name] and source and UnitIsUnit(source, unit) then
-                ApplyCoAIcon(self, coaSpellDB[name])
-            elseif spellDB[name] and specClass and source and UnitIsUnit(source, unit) then
-                local specTex = specClass[spellDB[name]]
-                if specTex then
-                    self.specTexture = specTex
-                    if not self.parent.db.profile.specIcons then
-                        self.SpecIcon.Texture:SetTexture("Interface\\Icons\\" .. self.specTexture)
-                        self.SpecBorderOverlay:Show()
-                        self.SpecIcon:Show()
-                    else
-                        self:UpdateClassIcon()
+            if source and UnitIsUnit(source, unit) then
+                if coaClassAuraDB[name] then
+                    -- Class-wide buff: proves the class, says nothing about the spec.
+                    -- Checked ahead of coaSpellDB because a few of these buffs also
+                    -- appear there against one arbitrary spec of the class, and
+                    -- trusting that would pin a wrong spec to the frame for the rest
+                    -- of the match.
+                    foundClass = foundClass or coaClassAuraDB[name]
+                elseif specAllowed and coaSpellDB[name] then
+                    if ApplyCoAIcon(self, coaSpellDB[name]) then return end
+                elseif specAllowed and spellDB[name] and specClass then
+                    local specTex = specClass[spellDB[name]]
+                    if specTex then
+                        self.specTexture = specTex
+                        if not self.parent.db.profile.specIcons then
+                            self.SpecIcon.Texture:SetTexture("Interface\\Icons\\" .. self.specTexture)
+                            self.SpecBorderOverlay:Show()
+                            self.SpecIcon:Show()
+                        else
+                            self:UpdateClassIcon()
+                        end
+                        return
                     end
                 end
             end
         else
             break
         end
+    end
+
+    -- No spec identified, but a class buff tells us who this is -- show the class icon
+    -- now rather than leaving a question mark up until their first cast.
+    if foundClass then
+        ApplyCoAClass(self, foundClass)
     end
 end

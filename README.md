@@ -29,15 +29,38 @@ addresses all of that.
 | Disarm | 12 |
 
 ### Class & spec detection
-**832 signature abilities** mapped across all 21 CoA classes and 70 class/spec
-combinations.
+Detection runs in two stages, so the icon is populated **as the gates open** rather
+than whenever the enemy first happens to act:
 
-This works differently from the stock detection for a specific reason: sArena's
+1. **Class, at the gates.** **248 class buffs** across all 21 classes. Every CoA class
+   has long-duration (mostly 30 minute) buffs that players put up during the
+   preparation phase, so they're already on the enemy the moment the gates open and
+   the frames become readable. Each of these names maps to exactly one class with no
+   collisions anywhere in the ability data, so a match is never ambiguous.
+2. **Spec, once they show it.** **832 signature abilities** across 70 class/spec
+   combinations. The first one seen upgrades the frame from a class icon to a spec
+   icon.
+
+**Stage 1 is what you get by default — spec detection ships turned off.** The class
+icon is known at the gates and then stays put for the whole match, whereas a spec can
+only be pinned down once the enemy uses a signature ability, so turning spec detection
+on means accepting an icon that changes partway through the match. Enable it under
+`/sarena` → **Enable Spec Detection** if that trade is worth it to you.
+
+A class buff only counts when the enemy is its own aura source. These buffs have
+30–40 yd range and get handed to the whole enemy team, so an unfiltered scan would
+report one player's class on every enemy frame.
+
+Both stages work differently from the stock detection for a specific reason: sArena's
 normal spec detection is gated behind `UnitClass()`, and there's no verified public
 mapping of which base WotLK class each CoA class runs on underneath. Rather than
 guess and risk silently wrong results, CoA detection runs as a fully independent
-path that identifies class and spec directly from the ability cast, ignoring
-`UnitClass()` entirely.
+path that ignores `UnitClass()` entirely.
+
+Class buffs are also deliberately never read as evidence of a spec. 48 of them also
+appear in the spec table against one arbitrary spec of their class, but any spec of
+that class can carry them — previously that could pin a wrong spec to a frame for the
+rest of the match.
 
 ### Class icon fix
 sArena crops class icons out of a shared 10-class texture sheet. For CoA characters
@@ -48,7 +71,11 @@ class icon.
 ### Module toggles (new)
 Previously all-or-nothing. Now individually switchable:
 - **Enable Diminishing Returns Tracking** — master switch on the DR tab
-- **Enable Spec Detection** — turn off to show only class, never spec
+- **Enable Spec Detection** — **off by default.** Turn it on to have the class icon
+  upgrade to a spec icon once the enemy uses a signature ability. This now does what it
+  says on CoA: with it off, the class icon still resolves from the enemy's buffs and
+  only the spec is suppressed. Previously it switched off the one detection path CoA
+  had, leaving a question mark for the whole match.
 - **Enable Class/Spec Icons** — hides the icons entirely and stops detection running
 - **Enable Cast Bar** — hides the cast bar module
 
@@ -65,8 +92,17 @@ Previously all-or-nothing. Now individually switchable:
   single trinket slot per frame with no concept of "this is the real trinket" — so
   adding them caused a class ability's short cooldown to display *as if* it were the
   enemy's trinket, which is worse than not tracking them at all. Left out deliberately.
-- **Spec detection may take a moment** at the start of a match, since it can only
-  identify a spec once that player casts a signature ability.
+- **The spec icon resolves progressively, which is why it's opt-in.** The class icon is
+  up as the gates open, but narrowing a class to one of its specs needs the enemy to use
+  a signature ability. With **Enable Spec Detection** turned on, the frame therefore
+  shows class-only for the opening moments and then switches icon mid-match.
+- **Gates-open class detection assumes the enemy buffed up.** That's essentially
+  universal in arena, but an unbuffed opponent falls back to being identified from
+  their first cast, as before.
+- **There is no API shortcut for this on CoA.** The 3.3.5 client has no arena-prep
+  spec API, `UnitClass()` doesn't report CoA classes, and Ascension exposes no
+  custom call for an opponent's class — reading the enemy's auras is the only thing
+  available at the gates.
 
 ## How it works
 

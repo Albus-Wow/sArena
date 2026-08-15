@@ -1005,8 +1005,11 @@ sArenaMixin.optionsTable = {
                                         for i = 1, 5 do
                                             local f = info.handler["arena"..i]
                                             if not val then
+                                                -- Drop the spec but keep coaClass: the class was
+                                                -- identified from the enemy's buffs, not from spec
+                                                -- detection, and it is exactly what this option
+                                                -- promises to leave on screen.
                                                 f.specTexture = nil
-                                                f.coaClass = nil
                                                 f.SpecIcon:Hide()
                                                 f.SpecBorderOverlay:Hide()
                                                 f.currentClassIconTexture = nil
