@@ -13,7 +13,7 @@ The existing Ascension build of sArena predates CoA — it was written for the
 classless Bronzebeard/Malfurion realms, and its own README flagged the DR and
 trinket trackers as needing spell ID updates. On CoA, DR tracking and spec
 detection didn't function at all, and the class icon was visibly broken. This port
-addresses all of that.
+addresses all of that. 
 
 ## What this port adds
 
