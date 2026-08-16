@@ -68,12 +68,6 @@ the lookup failed, which errored and left the icon displaying the **entire uncro
 sheet** — every class icon at once. Now handled safely, falling back to a real CoA
 class icon.
 
-That fallback had its own bug until a player (Easters) reported it: the CoA class
-icon table is `{ icon, spellId }`, not a bare icon string, and the code drawing it was
-concatenating the whole table onto the icon path instead of reading `.icon` out of it
-— so any CoA character who actually reached this branch got a Lua error instead of an
-icon. Fixed.
-
 ### Module toggles (new)
 Previously all-or-nothing. Now individually switchable:
 - **Enable Diminishing Returns Tracking** — master switch on the DR tab
