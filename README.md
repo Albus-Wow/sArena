@@ -116,7 +116,8 @@ health, casts, trinket cooldowns, DR tracking, and class/spec icons.
 ## Installation
 
 1. Download and extract
-2. Place the `sArena` folder into `Interface\AddOns\`
+2. Place the `sArena` folder into `Interface\AddOns\` (make sure the folder is
+   named exactly `sArena`, with no version suffix like `-master`)
 3. Enable **"Load out-of-date AddOns"** on the character select screen if it
    doesn't appear
 4. `/reload` or restart the game
