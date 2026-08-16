@@ -1060,10 +1060,15 @@ function sArenaFrameMixin:UpdateClassIcon()
         -- which errors and leaves the icon showing the raw, uncropped atlas (every
         -- class icon at once). Use a real CoA class icon if SpecIcons.lua identified
         -- one for this unit, otherwise fall back to the plain unknown icon -- never error.
-        local coaIcon = self.coaClass and sArenaCoAClassIcons and sArenaCoAClassIcons[self.coaClass]
-        if coaIcon then
+        --
+        -- sArenaCoAClassIcons[self.coaClass] is a { icon, spellId } table, not a bare
+        -- icon string -- coaIcon.icon is the field that was actually missing here, and
+        -- concatenating the table itself onto "Interface\Icons\" errored on every CoA
+        -- character that reached this branch.
+        local coaIconEntry = self.coaClass and sArenaCoAClassIcons and sArenaCoAClassIcons[self.coaClass]
+        if coaIconEntry then
             self.ClassIcon:SetTexCoord(0, 1, 0, 1)
-            self.ClassIcon:SetTexture("Interface\\Icons\\" .. coaIcon)
+            self.ClassIcon:SetTexture("Interface\\Icons\\" .. coaIconEntry.icon)
         else
             self.ClassIcon:SetTexCoord(0, 1, 0, 1)
             self.ClassIcon:SetTexture(unknown)
